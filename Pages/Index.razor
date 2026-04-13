@@ -1,0 +1,468 @@
+@page "/"
+@inject IJSRuntime JS
+@inject IDeadlockDemo DeadlockDemo
+@inject IParticleFactory ParticleFactory
+@implements IDisposable
+
+<div class="page-shell">
+
+    <!-- Top bar -->
+    <header class="top-bar">
+        <div>
+            <h1>Brownian Motion — Simulation</h1>
+            <span class="sub">MTPP · Project №1 · Multithreaded C#</span>
+        </div>
+        @if (_engine?.IsRunning == true)
+        {
+            <span class="badge badge-green" style="margin-left:auto">▶ Running</span>
+        }
+        else if (_stats != null)
+        {
+            <span class="badge badge-blue" style="margin-left:auto">✓ Completed</span>
+        }
+    </header>
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+
+        <div>
+            <div class="section-title">Crystal</div>
+            <div class="field"><label>Rows (N)</label>
+                <input type="number" @bind="_form.Rows" min="5" max="50" disabled="@_running" /></div>
+            <div class="field" style="margin-top:5px"><label>Columns (M)</label>
+                <input type="number" @bind="_form.Cols" min="5" max="50" disabled="@_running" /></div>
+            <div class="field" style="margin-top:5px"><label>Particles (K)</label>
+                <input type="number" @bind="_form.ParticleCount" min="1" max="500" disabled="@_running" /></div>
+        </div>
+
+        <div>
+            <div class="section-title">Simulation</div>
+            <div class="field"><label>Total steps</label>
+                <input type="number" @bind="_form.TotalSteps" min="10" max="2000" disabled="@_running" /></div>
+            <div class="field" style="margin-top:5px"><label>Snapshot every N steps</label>
+                <input type="number" @bind="_form.SnapshotEvery" min="1" max="100" disabled="@_running" /></div>
+            <div class="field" style="margin-top:5px"><label>Step delay (ms)</label>
+                <input type="number" @bind="_form.StepDelayMs" min="0" max="500" disabled="@_running" /></div>
+        </div>
+
+        <div>
+            <div class="section-title">Transition probabilities</div>
+            @foreach (var f in _form.ProbFields)
+            {
+                <div class="field" style="margin-top:4px">
+                    <label>@f.Label</label>
+                    <input type="number" step="0.05" min="0" max="1"
+                           value="@f.Get()"
+                           @onchange="e => f.Set(ParseDouble(e.Value))"
+                           disabled="@_running" />
+                </div>
+            }
+            <div class="prob-sum" style="color:@(_form.ProbValid ? "var(--green)" : "var(--red)")">
+                sum: @_form.ProbSum.ToString("F2") @(_form.ProbValid ? "✓" : "≠ 1.0")
+            </div>
+        </div>
+
+        <div>
+            <div class="section-title">Mode / reproducibility</div>
+            <div class="field"><label>Mode</label>
+                <select @bind="_form.ModeStr" disabled="@_running">
+                    <option value="Safe">✓ Safe (Interlocked)</option>
+                    <option value="Unsafe">⚠ Unsafe (race condition)</option>
+                </select>
+            </div>
+            <div class="field" style="margin-top:5px"><label>Seed (empty = random)</label>
+                <input type="text" @bind="_form.SeedText" placeholder="42" disabled="@_running" /></div>
+            @if (_form.Seed.HasValue)
+            {
+                <span class="badge badge-blue" style="margin-top:4px">🔁 seed=@_form.Seed</span>
+            }
+            else
+            {
+                <span class="badge badge-orange" style="margin-top:4px">🎲 random</span>
+            }
+        </div>
+
+        @if (_validationErrors.Count > 0)
+        {
+            <div class="error-box">
+                <div style="font-size:9px; color:var(--red); font-weight:700; text-transform:uppercase; letter-spacing:.06em; margin-bottom:4px">
+                    Config errors
+                </div>
+                @foreach (var err in _validationErrors)
+                {
+                    <div style="font-size:10px; color:var(--red)">• @err</div>
+                }
+            </div>
+        }
+
+        <div style="display:flex; flex-direction:column; gap:5px">
+            <button class="btn btn-primary" @onclick="StartSimulation"
+                    disabled="@(CanStart ? null : "disabled")">
+                ▶ Start simulation
+            </button>
+            <button class="btn btn-danger" @onclick="StopSimulation"
+                    disabled="@(_running ? null : "disabled")">
+                ■ Stop
+            </button>
+        </div>
+
+        <div>
+            <div class="section-title">Deadlock demo</div>
+            <p style="font-size:10px; color:var(--text3); margin-bottom:6px; line-height:1.5">
+                Two threads acquire locks in reverse order → circular wait.
+            </p>
+            <button class="btn btn-warning" @onclick="RunDeadlockUnsafe"
+                    disabled="@(_dlRunning ? "disabled" : null)">
+                ⚠ Run (unsafe order)
+            </button>
+            <button class="btn btn-info" style="margin-top:4px" @onclick="RunDeadlockSafe"
+                    disabled="@(_dlRunning ? "disabled" : null)">
+                ✓ Run (safe order)
+            </button>
+        </div>
+
+    </aside>
+
+    <!-- Main area: stats strip + heatmap + right panels -->
+    <div class="main">
+
+        <!-- Heatmap column -->
+        <div class="heatmap-col">
+
+            <!-- Stats strip -->
+            <div class="stats-strip">
+                <div class="stat-card inf">
+                    <div class="label">Threads</div>
+                    <div class="value">@_form.ParticleCount</div>
+                </div>
+                <div class="stat-card inf">
+                    <div class="label">Step</div>
+                    <div class="value">@_currentStep</div>
+                </div>
+                <div class="stat-card @ParticleCardCss">
+                    <div class="label">Particles</div>
+                    <div class="value">@(_lastSnap?.TotalParticles.ToString() ?? "—")</div>
+                </div>
+                <div class="stat-card @ParticleCardCss">
+                    <div class="label">Expected / Lost</div>
+                    <div class="value">@_form.ParticleCount / @(_lastSnap != null ? (_form.ParticleCount - _lastSnap.TotalParticles).ToString() : "—")</div>
+                </div>
+                <div class="stat-card inf">
+                    <div class="label">Elapsed</div>
+                    <div class="value" style="font-size:16px">@(_stats?.ElapsedMs.ToString("F0") ?? "—") <span style="font-size:10px; color:var(--text3)">ms</span></div>
+                </div>
+            </div>
+
+            <!-- Progress -->
+            <div class="progress-strip">
+                <div class="progress-fill" style="width:@(Progress)%"></div>
+            </div>
+
+            <!-- Heatmap -->
+            <div class="heatmap-header" style="margin-top:10px">
+                <span class="heatmap-title">Particle distribution</span>
+                @if (_lastSnap != null)
+                {
+                    <span style="font-size:9px; color:var(--text3)">
+                        step @_lastSnap.Step · max @_lastSnap.MaxDensity
+                    </span>
+                    <span class="badge @(_form.ModeStr == "Safe" ? "badge-green" : "badge-red")">
+                        @_lastSnap.Mode
+                    </span>
+                }
+            </div>
+            <div class="canvas-wrap">
+                <canvas id="crystalCanvas"></canvas>
+            </div>
+
+            <!-- Thermographic legend -->
+            <div class="legend">
+                <span class="legend-label">0</span>
+                <div class="legend-bar"></div>
+                <span class="legend-label">max (@(_lastSnap?.MaxDensity.ToString() ?? "—"))</span>
+            </div>
+
+        </div>
+
+        <!-- Right column: panels -->
+        <div class="right-col">
+
+            <!-- Race condition -->
+            @if (_form.ModeStr == "Unsafe" && _lastSnap != null)
+            {
+                <div class="panel race">
+                    <h2>⚠ Race condition</h2>
+                    <p style="font-size:10px; color:var(--text2); line-height:1.55">
+                        Each thread reads a cell value, yields the CPU, then writes back.
+                        Another thread reads the same stale value → one update lost (TOCTOU).
+                    </p>
+                    <div class="two-col">
+                        <div class="code-block bad">
+                            <div class="title">Without sync</div>
+                            <code>int v = cells[i];
+Thread.Yield();
+cells[i] = v - 1;
+// lost update</code>
+                        </div>
+                        <div class="code-block good">
+                            <div class="title">Interlocked</div>
+                            <code>Interlocked
+  .Decrement(
+    ref cells[i]);
+// always correct</code>
+                        </div>
+                    </div>
+                </div>
+            }
+
+            <!-- Deadlock result -->
+            @if (_dlResult != null)
+            {
+                <div class="panel dl">
+                    <h2>🔒 Deadlock result</h2>
+                    <p style="font-size:10px; color:@(_dlResult.DeadlockOccurred ? "var(--red)" : "var(--green)"); margin-bottom:6px">
+                        @_dlResult.Description
+                    </p>
+                    <div style="font-size:10px; color:var(--text3); margin-bottom:7px">
+                        Elapsed: @_dlResult.ElapsedMs ms
+                    </div>
+                    <div class="two-col">
+                        <div class="code-block @(_dlResult.DeadlockOccurred ? "bad" : "good")">
+                            <div class="title">Thread A</div>
+                            <code>@_dlResult.ThreadAStatus</code>
+                        </div>
+                        <div class="code-block @(_dlResult.DeadlockOccurred ? "bad" : "good")">
+                            <div class="title">Thread B</div>
+                            <code>@_dlResult.ThreadBStatus</code>
+                        </div>
+                    </div>
+                    <p style="font-size:10px; color:var(--text3); margin-top:8px; line-height:1.5">
+                        <span style="color:var(--text1); font-weight:700">Solution:</span>
+                        Always acquire locks in ascending identity order — circular wait becomes impossible.
+                    </p>
+                </div>
+            }
+
+            <!-- Log -->
+            <div class="log-panel">
+                @foreach (var e in _log)
+                {
+                    <div class="log-entry @e.Cls">@e.Text</div>
+                }
+            </div>
+
+            <!-- Summary -->
+            @if (_stats != null)
+            {
+                <div class="panel summary">
+                    <h2>📊 Summary</h2>
+                    <table class="summary-table">
+                        <tr><td class="key">Mode</td>              <td>@_stats.Mode</td></tr>
+                        <tr><td class="key">Threads</td>           <td>@_stats.ParticleCount</td></tr>
+                        <tr><td class="key">Steps</td>             <td>@_stats.TotalSteps</td></tr>
+                        <tr><td class="key">Elapsed</td>           <td>@(_stats.ElapsedMs.ToString("F1")) ms</td></tr>
+                        <tr><td class="key">Seed</td>              <td>@(_stats.Seed?.ToString() ?? "random")</td></tr>
+                        <tr>
+                            <td class="key">Start / End</td>
+                            <td style="color:@(_stats.Lost == 0 ? "var(--green)" : "var(--red)")">
+                                @_stats.ExpectedTotal → @_stats.FinalTotal (lost: @_stats.Lost)
+                            </td>
+                        </tr>
+                        @if (_stats.UnsafeStats is { } us)
+                        {
+                            <tr>
+                                <td class="key">Raw sum</td>
+                                <td style="color:@(us.RawSum < _stats.ExpectedTotal ? "var(--red)" : "var(--amber)")">
+                                    @us.RawSum
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="key">Cells below zero</td>
+                                <td style="color:@(us.NegativeCells > 0 ? "var(--red)" : "var(--green)")">
+                                    @us.NegativeCells
+                                    @(us.NegativeCells > 0 ? $"(min: {us.MinCell})" : "✓ none")
+                                </td>
+                            </tr>
+                        }
+                    </table>
+                </div>
+            }
+
+        </div>
+    </div>
+
+</div>
+
+@code {
+
+    private sealed class FormModel
+    {
+        public int    Rows          { get; set; } = 20;
+        public int    Cols          { get; set; } = 20;
+        public int    ParticleCount { get; set; } = 60;
+        public int    TotalSteps    { get; set; } = 300;
+        public int    SnapshotEvery { get; set; } = 5;
+        public int    StepDelayMs   { get; set; } = 60;
+        public string ModeStr       { get; set; } = "Safe";
+        public string SeedText      { get; set; } = "42";
+
+        private double _probUp    = 0.25;
+        private double _probDown  = 0.25;
+        private double _probLeft  = 0.25;
+        private double _probRight = 0.25;
+
+        public double ProbSum   => _probUp + _probDown + _probLeft + _probRight;
+        public bool   ProbValid => Math.Abs(ProbSum - 1.0) < 1e-9;
+        public int?   Seed      => int.TryParse(SeedText, out var v) ? v : null;
+        public SimulationMode Mode => Enum.Parse<SimulationMode>(ModeStr);
+
+        public IReadOnlyList<(string Label, Func<double> Get, Action<double> Set)> ProbFields =>
+        [
+            ("↑ Up",    () => _probUp,    v => _probUp    = v),
+            ("↓ Down",  () => _probDown,  v => _probDown  = v),
+            ("← Left",  () => _probLeft,  v => _probLeft  = v),
+            ("→ Right", () => _probRight, v => _probRight = v),
+        ];
+
+        public (SimulationConfig? Cfg, IReadOnlyList<string> Errors) TryBuild()
+        {
+            try
+            {
+                var cfg = new SimulationConfig
+                {
+                    Rows          = Rows,
+                    Cols          = Cols,
+                    ParticleCount = ParticleCount,
+                    TotalSteps    = TotalSteps,
+                    SnapshotEvery = SnapshotEvery,
+                    StepDelayMs   = StepDelayMs,
+                    Seed          = Seed,
+                    ProbUp        = _probUp,
+                    ProbDown      = _probDown,
+                    ProbLeft      = _probLeft,
+                    ProbRight     = _probRight,
+                    Mode          = Mode,
+                }.Validate();
+                return (cfg, []);
+            }
+            catch (ArgumentException ex)
+            {
+                var errors = ex.Message
+                    .Split('\n', StringSplitOptions.RemoveEmptyEntries)
+                    .Skip(1).ToList();
+                return (null, errors);
+            }
+        }
+    }
+
+    private readonly FormModel _form = new();
+
+    private ISimulationEngine?   _engine;
+    private SimulationStats?     _stats;
+    private Snapshot?            _lastSnap;
+    private bool                 _running;
+    private int                  _currentStep;
+    private DeadlockResult?      _dlResult;
+    private bool                 _dlRunning;
+    private List<string>         _validationErrors = [];
+
+    private readonly List<(string Text, string Cls)> _log = [];
+
+    private double Progress        => _form.TotalSteps > 0 ? _currentStep * 100.0 / _form.TotalSteps : 0;
+    private bool   CanStart        => !_running && _form.ProbValid;
+    private string ParticleCardCss => _lastSnap is null ? "inf"
+        : _lastSnap.TotalParticles == _form.ParticleCount ? "ok" : "err";
+
+    private async Task StartSimulation()
+    {
+        if (_running) return;
+
+        var (cfg, errors) = _form.TryBuild();
+        if (cfg is null) { _validationErrors = [..errors]; return; }
+        _validationErrors.Clear();
+
+        _log.Clear();
+        _lastSnap    = null;
+        _stats       = null;
+        _currentStep = 0;
+
+        _engine?.Dispose();
+        _engine = new SimulationEngine(cfg, ParticleFactory);
+
+        _engine.SnapshotReady += snap =>
+        {
+            _lastSnap    = snap;
+            _currentStep = snap.Step;
+            _ = InvokeAsync(async () =>
+            {
+                StateHasChanged();
+                await JS.InvokeVoidAsync(
+                    "drawHeatmap",
+                    "crystalCanvas", snap.Cells, snap.Rows, snap.Cols, snap.MaxDensity);
+            });
+        };
+
+        _engine.Completed += stats =>
+        {
+            _stats   = stats;
+            _running = false;
+            AddLog(
+                $"[✓] Done. Particles: {stats.FinalTotal}/{stats.ExpectedTotal}. " +
+                $"Lost: {stats.Lost}. Elapsed: {stats.ElapsedMs:F0} ms.",
+                stats.Lost == 0 ? "good" : "bad");
+            _ = InvokeAsync(StateHasChanged);
+        };
+
+        _running = true;
+        AddLog(
+            $"[▶] Start — mode: {cfg.Mode}, particles: {cfg.ParticleCount}, " +
+            $"grid: {cfg.Rows}×{cfg.Cols}, seed: {cfg.Seed?.ToString() ?? "random"}", "info");
+
+        if (cfg.Mode == SimulationMode.Unsafe)
+            AddLog("[⚠] Unsafe mode: race condition will be demonstrated.", "warn");
+
+        StateHasChanged();
+        await _engine.RunAsync();
+    }
+
+    private void StopSimulation()
+    {
+        _engine?.Stop();
+        AddLog("[■] Stopped manually.", "warn");
+    }
+
+    private async Task RunDeadlockUnsafe()
+    {
+        _dlRunning = true; _dlResult = null;
+        AddLog("[🔒] Running unsafe deadlock scenario...", "warn");
+        StateHasChanged();
+        _dlResult = await Task.Run(() => DeadlockDemo.RunUnsafe());
+        AddLog(_dlResult.DeadlockOccurred
+            ? $"[💀] DEADLOCK: timed out ({_dlResult.ElapsedMs} ms)"
+            : "[~] No deadlock this run. Try again.", _dlResult.DeadlockOccurred ? "bad" : "warn");
+        _dlRunning = false; StateHasChanged();
+    }
+
+    private async Task RunDeadlockSafe()
+    {
+        _dlRunning = true; _dlResult = null;
+        AddLog("[✓] Running safe (ordered) scenario...", "info");
+        StateHasChanged();
+        _dlResult = await Task.Run(() => DeadlockDemo.RunSafe());
+        AddLog($"[✓] Both threads completed without deadlock ({_dlResult.ElapsedMs} ms)", "good");
+        _dlRunning = false; StateHasChanged();
+    }
+
+    private void AddLog(string text, string cls = "")
+    {
+        _log.Add((text, cls));
+        if (_log.Count > 80) _log.RemoveAt(0);
+    }
+
+    private static double ParseDouble(object? value)
+        => double.TryParse(value?.ToString(),
+               System.Globalization.NumberStyles.Any,
+               System.Globalization.CultureInfo.InvariantCulture, out var d) ? d : 0;
+
+    public void Dispose() { _engine?.Stop(); _engine?.Dispose(); }
+}
