@@ -23,18 +23,18 @@ namespace BrownianMotion.Simulation.Engine;
 public sealed class SimulationEngine : ISimulationEngine
 {
     /// <inheritdoc/>
-    public event Action<Snapshot>?       SnapshotReady;
+    public event Action<Snapshot>? SnapshotReady;
 
     /// <inheritdoc/>
     public event Action<SimulationStats>? Completed;
 
-    private readonly SimulationConfig  _cfg;
-    private readonly ICrystal          _crystal;
-    private readonly IParticleFactory  _factory;
-    private readonly Stopwatch         _sw = new();
+    private readonly SimulationConfig _cfg;
+    private readonly ICrystal _crystal;
+    private readonly IParticleFactory _factory;
+    private readonly Stopwatch _sw = new();
 
-    private Barrier?                      _barrier;
-    private CancellationTokenSource       _cts = new();
+    private Barrier? _barrier;
+    private CancellationTokenSource _cts = new();
     private IReadOnlyList<ParticleThread> _particles = [];
 
     /// <inheritdoc/>
@@ -50,7 +50,7 @@ public sealed class SimulationEngine : ISimulationEngine
     /// </param>
     public SimulationEngine(SimulationConfig cfg, IParticleFactory? factory = null)
     {
-        _cfg     = cfg;
+        _cfg = cfg;
         _crystal = CrystalFactory.Create(cfg.Rows, cfg.Cols, cfg.Mode);
         _factory = factory ?? new ParticleFactory();
     }
@@ -126,35 +126,35 @@ public sealed class SimulationEngine : ISimulationEngine
         var step = (int)phase + 1;
         if (step % _cfg.SnapshotEvery != 0 && step != _cfg.TotalSteps) return;
 
-        var cells       = _crystal.Snapshot();
-        var total       = _crystal.Total();
+        var cells = _crystal.Snapshot();
+        var total = _crystal.Total();
         var unsafeStats = (_crystal as UnsafeCrystal)?.GetStats(cells);
 
         SnapshotReady?.Invoke(new Snapshot(
-            Step:           step,
-            ElapsedMs:      _sw.Elapsed.TotalMilliseconds,
-            Cells:          cells,
-            Rows:           _cfg.Rows,
-            Cols:           _cfg.Cols,
+            Step: step,
+            ElapsedMs: _sw.Elapsed.TotalMilliseconds,
+            Cells: cells,
+            Rows: _cfg.Rows,
+            Cols: _cfg.Cols,
             TotalParticles: total,
-            UnsafeStats:    unsafeStats,
-            Mode:           _cfg.Mode.ToString()));
+            UnsafeStats: unsafeStats,
+            Mode: _cfg.Mode.ToString()));
     }
 
     private SimulationStats BuildStats()
     {
-        var cells       = _crystal.Snapshot();
+        var cells = _crystal.Snapshot();
         var unsafeStats = (_crystal as UnsafeCrystal)?.GetStats(cells);
 
         return new SimulationStats(
-            TotalSteps:    _cfg.TotalSteps,
+            TotalSteps: _cfg.TotalSteps,
             ParticleCount: _cfg.ParticleCount,
-            ElapsedMs:     _sw.Elapsed.TotalMilliseconds,
-            FinalTotal:    _crystal.Total(),
-            UnsafeStats:   unsafeStats,
+            ElapsedMs: _sw.Elapsed.TotalMilliseconds,
+            FinalTotal: _crystal.Total(),
+            UnsafeStats: unsafeStats,
             ExpectedTotal: _cfg.ParticleCount,
-            Seed:          _cfg.Seed,
-            Mode:          _cfg.Mode.ToString());
+            Seed: _cfg.Seed,
+            Mode: _cfg.Mode.ToString());
     }
 
     /// <inheritdoc/>

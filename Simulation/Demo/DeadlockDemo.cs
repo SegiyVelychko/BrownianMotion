@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Runtime.CompilerServices;
 using BrownianMotion.Simulation.Contracts;
 using BrownianMotion.Simulation.Models;
 
@@ -29,10 +30,10 @@ public sealed class DeadlockDemo : IDeadlockDemo
     /// <inheritdoc/>
     public DeadlockResult RunUnsafe(int timeoutMs = 2000)
     {
-        string statusA   = "not started";
-        string statusB   = "not started";
-        var    deadlocked = false;
-        var    sw         = Stopwatch.StartNew();
+        string statusA = "not started";
+        string statusB  = "not started";
+        var deadlocked = false;
+        var sw = Stopwatch.StartNew();
 
         var threadA = new Thread(() =>
         {
@@ -139,8 +140,8 @@ public sealed class DeadlockDemo : IDeadlockDemo
     /// </summary>
     private static (object first, object second) OrderedLocks(object a, object b)
     {
-        var ha = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(a);
-        var hb = System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(b);
+        var ha = RuntimeHelpers.GetHashCode(a);
+        var hb = RuntimeHelpers.GetHashCode(b);
         return ha <= hb ? (a, b) : (b, a);
     }
 }

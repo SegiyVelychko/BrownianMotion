@@ -60,16 +60,16 @@ public sealed record SimulationConfig
     {
         var errors = new List<string>();
 
-        if (Rows          <= 0) errors.Add($"{nameof(Rows)} must be > 0.");
-        if (Cols          <= 0) errors.Add($"{nameof(Cols)} must be > 0.");
+        if (Rows <= 0) errors.Add($"{nameof(Rows)} must be > 0.");
+        if (Cols <= 0) errors.Add($"{nameof(Cols)} must be > 0.");
         if (ParticleCount <= 0) errors.Add($"{nameof(ParticleCount)} must be > 0.");
-        if (TotalSteps    <= 0) errors.Add($"{nameof(TotalSteps)} must be > 0.");
+        if (TotalSteps <= 0) errors.Add($"{nameof(TotalSteps)} must be > 0.");
         if (SnapshotEvery <= 0) errors.Add($"{nameof(SnapshotEvery)} must be > 0.");
-        if (StepDelayMs   <  0) errors.Add($"{nameof(StepDelayMs)} must be >= 0.");
+        if (StepDelayMs < 0) errors.Add($"{nameof(StepDelayMs)} must be >= 0.");
 
-        if (ProbUp    < 0 || ProbUp    > 1) errors.Add($"{nameof(ProbUp)} must be in [0,1].");
-        if (ProbDown  < 0 || ProbDown  > 1) errors.Add($"{nameof(ProbDown)} must be in [0,1].");
-        if (ProbLeft  < 0 || ProbLeft  > 1) errors.Add($"{nameof(ProbLeft)} must be in [0,1].");
+        if (ProbUp < 0 || ProbUp > 1) errors.Add($"{nameof(ProbUp)} must be in [0,1].");
+        if (ProbDown < 0 || ProbDown > 1) errors.Add($"{nameof(ProbDown)} must be in [0,1].");
+        if (ProbLeft < 0 || ProbLeft > 1) errors.Add($"{nameof(ProbLeft)} must be in [0,1].");
         if (ProbRight < 0 || ProbRight > 1) errors.Add($"{nameof(ProbRight)} must be in [0,1].");
 
         var probSum = ProbUp + ProbDown + ProbLeft + ProbRight;

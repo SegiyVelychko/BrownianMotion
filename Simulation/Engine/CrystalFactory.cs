@@ -24,8 +24,8 @@ public static class CrystalFactory
     public static ICrystal Create(int rows, int cols, SimulationMode mode)
         => mode switch
         {
-            SimulationMode.Safe   => new SafeCrystal(rows, cols),
+            SimulationMode.Safe => new SafeCrystal(rows, cols),
             SimulationMode.Unsafe => new UnsafeCrystal(rows, cols),
-            _                     => throw new ArgumentOutOfRangeException(nameof(mode), mode, null),
+            _ => throw new ArgumentOutOfRangeException(nameof(mode), mode, null),
         };
 }

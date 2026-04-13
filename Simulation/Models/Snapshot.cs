@@ -18,14 +18,14 @@ namespace BrownianMotion.Simulation.Models;
 /// </param>
 /// <param name="Mode">String label of the active <see cref="SimulationMode"/>.</param>
 public sealed record Snapshot(
-    int          Step,
-    double       ElapsedMs,
-    int[]        Cells,
-    int          Rows,
-    int          Cols,
-    int          TotalParticles,
+    int Step,
+    double ElapsedMs,
+    int[] Cells,
+    int Rows,
+    int Cols,
+    int TotalParticles,
     UnsafeStats? UnsafeStats,
-    string       Mode)
+    string Mode)
 {
     /// <summary>
     /// Maximum particle density across all cells.

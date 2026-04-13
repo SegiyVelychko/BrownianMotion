@@ -12,8 +12,8 @@ namespace BrownianMotion.Simulation.Models;
 /// <param name="ThreadBStatus">Final status message from Thread B.</param>
 /// <param name="ElapsedMs">Wall-clock duration of the scenario in milliseconds.</param>
 public sealed record DeadlockResult(
-    bool   DeadlockOccurred,
+    bool DeadlockOccurred,
     string Description,
     string ThreadAStatus,
     string ThreadBStatus,
-    long   ElapsedMs);
+    long ElapsedMs);

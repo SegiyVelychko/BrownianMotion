@@ -21,14 +21,14 @@ namespace BrownianMotion.Simulation.Models;
 /// <param name="Seed">RNG seed used, or <c>null</c> for a non-reproducible run.</param>
 /// <param name="Mode">String label of the active <see cref="SimulationMode"/>.</param>
 public sealed record SimulationStats(
-    int          TotalSteps,
-    int          ParticleCount,
-    double       ElapsedMs,
-    int          FinalTotal,
+    int TotalSteps,
+    int ParticleCount,
+    double ElapsedMs,
+    int FinalTotal,
     UnsafeStats? UnsafeStats,
-    int          ExpectedTotal,
-    int?         Seed,
-    string       Mode)
+    int ExpectedTotal,
+    int? Seed,
+    string Mode)
 {
     /// <summary>
     /// Number of particles missing at the end of the run.

@@ -11,12 +11,12 @@ public sealed class ParticleFactory : IParticleFactory
 {
     /// <inheritdoc/>
     public ParticleThread Create(
-        int               id,
-        int               startRow,
-        int               startCol,
-        ICrystal          crystal,
-        SimulationConfig  cfg,
-        Barrier           barrier,
+        int id,
+        int startRow,
+        int startCol,
+        ICrystal crystal,
+        SimulationConfig cfg,
+        Barrier barrier,
         CancellationToken ct)
         => new(id, startRow, startCol, crystal, cfg, barrier, ct);
 }

@@ -27,7 +27,7 @@ public static class CrystalStats
     /// Computes all unsafe-mode diagnostics over <paramref name="snapshot"/> in a single pass.
     /// </summary>
     public static UnsafeStats GetUnsafeStats(int[] snapshot) => new(
-        RawSum:        Total(snapshot),
+        RawSum: Total(snapshot),
         NegativeCells: NegativeCellCount(snapshot),
-        MinCell:       MinCell(snapshot));
+        MinCell: MinCell(snapshot));
 }

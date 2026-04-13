@@ -34,12 +34,12 @@ public sealed class ParticleThread
     // Spreads sequential IDs uniformly across the int space.
     private const int KnuthFactor = unchecked((int)2_654_435_761u);
 
-    private readonly ICrystal          _crystal;
-    private readonly SimulationConfig  _cfg;
-    private readonly Barrier           _barrier;
+    private readonly ICrystal _crystal;
+    private readonly SimulationConfig _cfg;
+    private readonly Barrier _barrier;
     private readonly CancellationToken _ct;
-    private readonly Random            _rng;
-    private readonly Thread            _thread;
+    private readonly Random _rng;
+    private readonly Thread _thread;
 
     // Owned exclusively by this thread — no locking required.
     private int _row;
@@ -63,21 +63,21 @@ public sealed class ParticleThread
     /// <param name="barrier">Barrier shared with all other particles and the engine.</param>
     /// <param name="ct">Token used to request cooperative cancellation.</param>
     public ParticleThread(
-        int               id,
-        int               startRow,
-        int               startCol,
-        ICrystal          crystal,
-        SimulationConfig  cfg,
-        Barrier           barrier,
+        int id,
+        int startRow,
+        int startCol,
+        ICrystal crystal,
+        SimulationConfig cfg,
+        Barrier barrier,
         CancellationToken ct)
     {
-        Id       = id;
-        _row     = startRow;
-        _col     = startCol;
+        Id = id;
+        _row = startRow;
+        _col = startCol;
         _crystal = crystal;
-        _cfg     = cfg;
+        _cfg = cfg;
         _barrier = barrier;
-        _ct      = ct;
+        _ct = ct;
 
         var seed = cfg.Seed.HasValue
             ? cfg.Seed.Value ^ (id * KnuthFactor)
@@ -87,7 +87,7 @@ public sealed class ParticleThread
 
         _thread = new Thread(Run)
         {
-            Name         = $"Particle-{id}",
+            Name = $"Particle-{id}",
             IsBackground = true,
         };
     }
@@ -149,10 +149,10 @@ public sealed class ParticleThread
 
         (int dr, int dc) = roll switch
         {
-            _ when roll < _cfg.ProbUp                                        => (-1,  0),
-            _ when roll < _cfg.ProbUp + _cfg.ProbDown                       => ( 1,  0),
-            _ when roll < _cfg.ProbUp + _cfg.ProbDown + _cfg.ProbLeft       => ( 0, -1),
-            _                                                                 => ( 0,  1),
+            _ when roll < _cfg.ProbUp => (-1,  0),
+            _ when roll < _cfg.ProbUp + _cfg.ProbDown => ( 1,  0),
+            _ when roll < _cfg.ProbUp + _cfg.ProbDown + _cfg.ProbLeft => ( 0, -1),
+            _ => ( 0,  1),
         };
 
         return (

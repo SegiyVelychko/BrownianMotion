@@ -1,3 +1,4 @@
+using BrownianMotion.Simulation.Engine;
 using BrownianMotion.Simulation.Models;
 
 namespace BrownianMotion.Simulation.Contracts;
@@ -19,12 +20,12 @@ public interface IParticleFactory
     /// <param name="cfg">Configuration for this run.</param>
     /// <param name="barrier">Barrier synchronising all particle threads with the engine.</param>
     /// <param name="ct">Token used to request cooperative cancellation.</param>
-    Engine.ParticleThread Create(
-        int              id,
-        int              startRow,
-        int              startCol,
-        ICrystal         crystal,
+    ParticleThread Create(
+        int id,
+        int startRow,
+        int startCol,
+        ICrystal crystal,
         SimulationConfig cfg,
-        Barrier          barrier,
+        Barrier barrier,
         CancellationToken ct);
 }
